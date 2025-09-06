@@ -1,7 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:pulse_app/services/api_service.dart';
 
-class LoginScreen  extends StatelessWidget {
+
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _rememberMe = false;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+      _showErrorDialog('Please fill in all fields');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final result = await ApiService.login(
+      _usernameController.text.trim(),
+      _passwordController.text,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (result['success']) {
+      // Login successful
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      // Login failed
+      _showErrorDialog(result['error']);
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,7 +71,7 @@ class LoginScreen  extends StatelessWidget {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Illustration Image (replace with your asset)
+              // Illustration Image
               Padding(
                 padding: const EdgeInsets.only(top: 30.0),
                 child: Image.asset(
@@ -27,7 +87,7 @@ class LoginScreen  extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFE8EAFD), // light violet background
+                  color: Color(0xFFE8EAFD),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(32),
                     topRight: Radius.circular(32),
@@ -55,12 +115,12 @@ class LoginScreen  extends StatelessWidget {
                     ),
                     const SizedBox(height: 25),
 
-                    // Email Field
+                    // Username/Email Field
                     TextField(
+                      controller: _usernameController,
                       decoration: InputDecoration(
                         labelText: "username/email",
                         prefixIcon: const Icon(Icons.email_outlined),
-                        suffixIcon: const Icon(Icons.visibility_off),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -73,11 +133,19 @@ class LoginScreen  extends StatelessWidget {
 
                     // Password Field
                     TextField(
-                      obscureText: true,
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
                       decoration: InputDecoration(
                         labelText: "password",
                         prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() => _obscurePassword = !_obscurePassword);
+                          },
+                        ),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -95,8 +163,10 @@ class LoginScreen  extends StatelessWidget {
                         Row(
                           children: [
                             Checkbox(
-                              value: false,
-                              onChanged: (value) {},
+                              value: _rememberMe,
+                              onChanged: (value) {
+                                setState(() => _rememberMe = value ?? false);
+                              },
                               activeColor: const Color(0xFF0A1034),
                             ),
                             const Text("Remember me"),
@@ -122,12 +192,9 @@ class LoginScreen  extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushReplacementNamed(context, '/home');
-                        },
-
+                        onPressed: _isLoading ? null : _login,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A1034), // dark navy
+                          backgroundColor: const Color(0xFF0A1034),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
@@ -138,7 +205,16 @@ class LoginScreen  extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        child: const Text("Login"),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text("Login"),
                       ),
                     ),
                     const SizedBox(height: 15),

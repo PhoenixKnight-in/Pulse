@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../services/api_service.dart';
 import 'notification_screen.dart';
 import 'motivation_page.dart';
 import 'habit_tracker_screen.dart';
@@ -7,19 +8,65 @@ import 'pomodoro_screen.dart';
 import 'challenges_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  Map<String, dynamic>? _user;
+  bool _isLoading = true;
+  
+  // Calendar and task management variables
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-
-  /// ✅ Store tasks per date
   final Map<DateTime, List<String>> _tasksByDate = {};
   final TextEditingController _taskController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final result = await ApiService.getCurrentUser();
+    if (result['success']) {
+      setState(() {
+        _user = result['data'];
+        _isLoading = false;
+      });
+    } else {
+      // Token might be expired, redirect to login
+      await ApiService.logout();
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
+  Future<void> _logout() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ApiService.logout();
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Helper to normalize DateTime (strip hours/mins/seconds)
   DateTime _getDateOnly(DateTime date) =>
@@ -31,6 +78,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E21),
       body: SafeArea(
@@ -67,18 +122,55 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.notifications,
-                      color: Colors.blue, size: 28),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const NotificationsPage()),
-                    );
-                  },
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications,
+                          color: Colors.blue, size: 28),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const NotificationsPage()),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout, color: Colors.blue, size: 28),
+                    ),
+                  ],
                 ),
               ],
+            ),
+            const SizedBox(height: 20),
+
+            // Welcome message for authenticated user
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'Welcome, ${_user?['username'] ?? 'User'}!',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (_user?['email'] != null)
+                    Text(
+                      _user!['email'],
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
 
